@@ -1,0 +1,98 @@
+-- [[ NEKOHUB TELEPORT MODULE V4 ]] --
+local TeleportLib = {}
+
+-- Cấu hình mặc định
+TeleportLib.Settings = {
+    TeleportSpeed = 30,
+    TeleportMethod = "Tween", 
+    UseFloat = false
+}
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local LastTween = nil
+
+-- Tạo phần bypass rơi
+local FloatPart = Instance.new('Part')
+FloatPart.Name = "NekoModule_Float"
+FloatPart.Transparency = 1
+FloatPart.Size = Vector3.new(2, 0.2, 1.5)
+FloatPart.Anchored = true
+FloatPart.CanCollide = false
+FloatPart.Parent = workspace
+
+RunService.RenderStepped:Connect(function()
+    if TeleportLib.Settings.UseFloat and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        FloatPart.CanCollide = true
+        FloatPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(0, -3.1, 0)
+    else
+        FloatPart.CanCollide = false
+        FloatPart.CFrame = CFrame.new(0, 9999, 0)
+    end
+end)
+
+local function SetNoclip(state)
+    if not LocalPlayer.Character then return end
+    for _, child in pairs(LocalPlayer.Character:GetDescendants()) do
+        if child:IsA("BasePart") then
+            child.CanCollide = not state
+        end
+    end
+end
+
+function TeleportLib.MiniTp(targetPos)
+    TeleportLib.Settings.UseFloat = true
+    local character = LocalPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    local rootPart = character.HumanoidRootPart
+    while (rootPart.Position - targetPos).Magnitude > 3 do
+        local offset = targetPos - rootPart.Position
+        local distance = offset.Magnitude
+        local step, waitTime
+        if distance <= 50 then step = Vector3.new(1, 2, 1); waitTime = 0.04
+        elseif distance <= 30 then step = Vector3.new(1, 2, 1); waitTime = 0.005
+        else step = Vector3.new(2.5, 4.5, 2.5); waitTime = 0.20 end
+        local steps = math.ceil(distance / step.Magnitude)
+        local newStep = offset / steps
+        for i = 1, steps do
+            rootPart.CFrame = CFrame.new(rootPart.Position + newStep)
+            task.wait(waitTime)
+        end
+    end
+    rootPart.CFrame = CFrame.new(targetPos)
+    TeleportLib.Settings.UseFloat = false
+end
+
+function TeleportLib.TweenTp(targetPos)
+    local character = LocalPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    local rootPart = character.HumanoidRootPart
+    local distance = (rootPart.Position - targetPos).Magnitude
+    local duration = distance / TeleportLib.Settings.TeleportSpeed
+    if LastTween then LastTween:Cancel() end
+    SetNoclip(true)
+    local tween = TweenService:Create(rootPart, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = CFrame.new(targetPos)})
+    LastTween = tween
+    tween:Play()
+    tween.Completed:Connect(function() SetNoclip(false); LastTween = nil end)
+end
+
+function TeleportLib.Teleport(targetPos)
+    local method = TeleportLib.Settings.TeleportMethod
+    if method == "Tween" then TeleportLib.TweenTp(targetPos)
+    elseif method == "MiniTp" then TeleportLib.MiniTp(targetPos)
+    elseif method == "Instant" then 
+        if LocalPlayer.Character then LocalPlayer.Character:SetPrimaryPartCFrame(CFrame.new(targetPos)) end
+    end
+end
+
+function TeleportLib.Stop()
+    if LastTween then LastTween:Cancel() end
+    TeleportLib.Settings.UseFloat = false
+    SetNoclip(false)
+end
+
+return TeleportLib -- Dòng này cực kỳ quan trọng
+
